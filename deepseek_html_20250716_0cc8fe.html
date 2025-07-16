@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Receipt Scanner & Manager</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+      padding: 10px; 
+      background: #f4f4f4; 
+      margin: 0; 
+      line-height: 1.4;
+    }
+    h1, h2 { 
+      text-align: center; 
+      margin: 10px 0; 
+      font-size: 1.5rem;
+    }
+    #controls { 
+      display: flex; 
+      flex-direction: column;
+      gap: 8px; 
+      margin: 10px 0; 
+    }
+    .btn { 
+      padding: 12px 16px; 
+      cursor: pointer; 
+      border: none; 
+      background: #007bff; 
+      color: white; 
+      border-radius: 8px; 
+      font-size: 1rem;
+      width: 100%;
+    }
+    .btn:hover { 
+      background: #0056b3; 
+    }
+    .btn.secondary {
+      background: #6c757d;
+    }
+    .btn.secondary:hover {
+      background: #5a6268;
+    }
+    #preview { 
+      max-width: 100%; 
+      display: block; 
+      margin: 10px auto; 
+      max-height: 300px;
+      border-radius: 8px;
+    }
+    #cameraPreview {
+      width: 100%;
+      max-height: 300px;
+      object-fit: cover;
+      border-radius: 8px;
+      display: none;
+    }
+    .table-container { 
+      max-height: 60vh; 
+      overflow-y: auto; 
+      margin-top: 10px; 
+      background: white; 
+      border-radius: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 0.9rem; 
+    }
+    th, td { 
+      border: 1px solid #ccc; 
+      padding: 8px; 
+      text-align: center; 
+    }
+    th { 
+      background: #ddd; 
+      position: sticky; 
+      top: 0; 
+      z-index: 1; 
+      font-size: 0.8rem;
+    }
+    .delete-btn { 
+      cursor: pointer; 
+      color: white; 
+      padding: 4px 8px; 
+      border: none; 
+      border-radius: 4px; 
+      background-color: #dc3545;
+      font-size: 0.8rem;
+    }
+    .delete-btn:focus { 
+      outline: 2px solid #000; 
+    }
+    #groupControls { 
+      margin: 10px 0; 
+      text-align: center; 
+    }
+    #exportButton { 
+      margin-top: 10px; 
+      width: 100%;
+      padding: 12px;
+    }
+    .tab-container { 
+      display: flex; 
+      justify-content: center; 
+      margin-bottom: 15px;
+      gap: 5px;
+    }
+    .tab { 
+      padding: 10px 15px; 
+      cursor: pointer; 
+      background: #ddd; 
+      border: none; 
+      border-radius: 8px;
+      font-size: 0.9rem;
+      flex: 1;
+      text-align: center;
+    }
+    .tab.active { 
+      background: #007bff; 
+      color: white; 
+    }
+    .content-section { 
+      display: none; 
+    }
+    .content-section.active { 
+      display: block; 
+    }
+    select, input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    #cameraControls {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    #cameraControls button {
+      flex: 1;
+    }
+    @media (min-width: 768px) {
+      #controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+      .btn {
+        width: auto;
+        flex: 1;
+      }
+      #imageInput {
+        flex: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Receipt Scanner & Manager</h1>
+
+  <div class="tab-container">
+    <button class="tab" onclick="switchTab('scanner')">Scanner</button>
+    <button class="tab active" onclick="switchTab('manager')">Item Manager</button>
+  </div>
+
+  <div id="scanner-section" class="content-section">
+    <h2>Receipt Scanner</h2>
+    <div id="controls">
+      <input type="file" id="imageInput" accept="image/*" capture="environment" class="btn secondary" />
+      <button class="btn" onclick="startCamera()">Use Camera</button>
+      <button class="btn" onclick="processReceipt()">Scan Receipt</button>
+      <button class="btn secondary" onclick="addManualEntry()">Add Item Manually</button>
+    </div>
+    <img id="preview" src="" />
+    <video id="cameraPreview" autoplay playsinline></video>
+    <div id="cameraControls" style="display: none;">
+      <button class="btn" onclick="captureImage()">Capture</button>
+      <button class="btn secondary" onclick="stopCamera()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="manager-section" class="content-section active">
+    <h2>Item Manager</h2>
+    <div id="groupControls">
+      <label for="grouping">Group View: </label>
+      <select id="grouping" onchange="toggleGroupBy(this.value)">
+        <option value="regular">Regular View</option>
+        <option value="receipt">Group by Receipt</option>
+        <option value="type">Group by Type</option>
+      </select>
+    </div>
+
+    <div class="table-container">
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th>Receipt #</th>
+            <th>Item #</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <button id="exportButton" class="btn" onclick="exportToCSV()">Export to CSV</button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDuhEFWYDi65lk9M1dmIt2zQ31NxeqVuGM",
+      authDomain: "barcodescannerapp-65656.firebaseapp.com",
+      databaseURL: "https://barcodescannerapp-65656-default-rtdb.firebaseio.com",
+      projectId: "barcodescannerapp-65656",
+      storageBucket: "barcodescannerapp-65656.appspot.com",
+      messagingSenderId: "489535409057",
+      appId: "1:489535409057:web:25eaafbc8b45e99adb19e0"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const openaiKey = "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";
+
+    let itemList = [];
+    let receiptNumber = 1;
+    let manualItemCounter = 1;
+    let groupBy = 'regular';
+    let stream = null;
+
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraControls = document.getElementById('cameraControls');
+
+    // Set manager as default view
+    window.onload = async function () {
+      const snapshot = await db.ref("receipts/latest").once("value");
+      const data = snapshot.val();
+      if (data && Array.isArray(data.items)) {
+        itemList = data.items;
+        const allReceipts = itemList.map(i => i.receiptNumber);
+        receiptNumber = allReceipts.length ? Math.max(...allReceipts.filter(n => n !== 99)) + 1 : 1;
+        manualItemCounter = itemList.filter(i => i.receiptNumber === 99).length + 1;
+        renderTable();
+      }
+    };
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+      });
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      document.getElementById(`${tabName}-section`).classList.add('active');
+      document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+      
+      if (tabName === 'manager') {
+        renderTable();
+      } else if (tabName === 'scanner') {
+        stopCamera(); // Ensure camera is off when switching away
+      }
+    }
+
+    // Camera functions
+    async function startCamera() {
+      try {
+        stopCamera(); // Stop any existing stream
+        
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false 
+        });
+        
+        cameraPreview.srcObject = stream;
+        cameraPreview.style.display = 'block';
+        preview.style.display = 'none';
+        cameraControls.style.display = 'flex';
+        imageInput.style.display = 'none';
+        
+        // Hide other buttons when camera is active
+        document.querySelectorAll('#controls button:not(#cameraControls button)').forEach(btn => {
+          btn.style.display = 'none';
+        });
+      } catch (err) {
+        console.error("Camera error:", err);
+        alert("Could not access the camera. Please check permissions.");
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      cameraPreview.style.display = 'none';
+      cameraControls.style.display = 'none';
+      preview.style.display = 'block';
+      imageInput.style.display = 'block';
+      
+      // Show other buttons again
+      document.querySelectorAll('#controls button').forEach(btn => {
+        btn.style.display = 'block';
+      });
+    }
+
+    function captureImage() {
+      const canvas = document.createElement('canvas');
+      canvas.width = cameraPreview.videoWidth;
+      canvas.height = cameraPreview.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+      
+      preview.src = canvas.toDataURL('image/jpeg');
+      stopCamera();
+    }
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => { 
+          preview.src = reader.result; 
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    async function processReceipt() {
+      let imageSrc;
+      
+      if (preview.src && preview.src !== '') {
+        imageSrc = preview.src;
+      } else {
+        alert("Please upload a receipt image or capture one with the camera.");
+        return;
+      }
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(imageSrc, 'eng');
+        const parsed = await sendToOpenAI(text);
+        if (!parsed || !Array.isArray(parsed.items)) {
+          alert("Failed to parse items. Please try again with a clearer image.");
+          return;
+        }
+
+        const newItems = parsed.items.map((item, i) => ({
+          item: item.item || '',
+          quantity: parseFloat(item.quantity) || 1,
+          price: parseFloat(item.price) || 0,
+          type: item.type || "other",
+          receiptNumber: receiptNumber,
+          itemNumber: i + 1
+        }));
+
+        itemList.push(...newItems);
+        receiptNumber++;
+        renderTable();
+        saveAllToFirebase();
+        switchTab('manager');
+        
+        // Clear the preview
+        preview.src = '';
+        imageInput.value = '';
+      } catch (error) {
+        console.error("Processing error:", error);
+        alert("An error occurred while processing the receipt. Please try again.");
+      }
+    }
+
+    async function sendToOpenAI(receiptText) {
+      const prompt = `Extract and normalize itemized entries from this receipt. For each item:
+1. Replace with common name (e.g., "Granny Smith Apples" → "Apples")
+2. Determine the best category from: protein, carbs, vegetables, fruit, snacks, other
+3. Return JSON with item, quantity, price, and type
+
+Examples:
+- "Boneless Skinless Chicken Breast" → {"item": "Chicken Breast", "type": "protein"}
+- "Whole Wheat Bread" → {"item": "Bread", "type": "carbs"}
+- "Gala Apples" → {"item": "Apples", "type": "fruit"}
+- "Lays Potato Chips" → {"item": "Potato Chips", "type": "snacks"}
+- "Dove Body Wash" → {"item": "Body Wash", "type": "other"}
+
+Receipt Text:
+${receiptText}
+
+Return JSON format:
+{"items":[{"item":"Milk","quantity":1,"price":2.99,"type":"other"}]}`;
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          response_format: { type: "json_object" }
+        })
+      });
+      
+      const result = await response.json();
+      const content = result.choices?.[0]?.message?.content || "";
+      
+      try {
+        const jsonStart = content.indexOf('{');
+        const jsonEnd = content.lastIndexOf('}') + 1;
+        const parsed = JSON.parse(content.slice(jsonStart, jsonEnd));
+        
+        // Validate and clean the response
+        if (parsed && Array.isArray(parsed.items)) {
+          parsed.items = parsed.items.map(item => ({
+            item: item.item || '',
+            quantity: parseFloat(item.quantity) || 1,
+            price: parseFloat(item.price) || 0,
+            type: ["protein", "carbs", "vegetables", "fruit", "snacks", "other"].includes(item.type?.toLowerCase()) 
+                  ? item.type.toLowerCase() 
+                  : "other"
+          }));
+          return parsed;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+
+    function addManualEntry() {
+      const newItem = {
+        item: "New Item",
+        quantity: 1,
+        price: 0.00,
+        receiptNumber: 99,
+        itemNumber: manualItemCounter++,
+        type: ""
+      };
+      itemList.push(newItem);
+      renderTable();
+      saveAllToFirebase();
+      switchTab('manager');
+    }
+
+    function commitPlaceholder(td) {
+      const tr = td.parentElement;
+      const cells = tr.children;
+      const itemText = cells[2].innerText.trim();
+      const typeSelect = cells[5].querySelector("select");
+      const type = typeSelect?.value || "";
+      if (itemText) {
+        const newItem = {
+          item: itemText,
+          quantity: parseFloat(cells[3].innerText) || 1,
+          price: parseFloat(cells[4].innerText) || 0,
+          type: type,
+          receiptNumber: 99,
+          itemNumber: manualItemCounter++
+        };
+        itemList.push(newItem);
+        saveAllToFirebase();
+        renderTable(true);
+      }
+    }
+
+    function renderTable(focusLastPlaceholder = false) {
+      const tbody = document.querySelector("#itemsTable tbody");
+      tbody.innerHTML = "";
+      let grandTotal = 0;
+
+      let rowsToRender = itemList;
+      if (groupBy !== 'regular') {
+        const grouped = {};
+        itemList.forEach(item => {
+          const key = groupBy === 'type' ? item.type || 'Uncategorized' : `Receipt #${item.receiptNumber}`;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(item);
+        });
+
+        rowsToRender = [];
+        for (const group in grouped) {
+          rowsToRender.push({ isGroup: true, name: group });
+          rowsToRender = rowsToRender.concat(grouped[group]);
+        }
+      }
+
+      rowsToRender.forEach((item, index) => {
+        if (item.isGroup) {
+          const groupRow = document.createElement("tr");
+          groupRow.innerHTML = `<td colspan="7" style="background:#eee; font-weight:bold; text-align:left">${item.name}</td>`;
+          tbody.appendChild(groupRow);
+        } else {
+          grandTotal += item.price * item.quantity;
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${item.receiptNumber}</td>
+            <td>${item.itemNumber}</td>
+            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'item', this.innerText)">${item.item}</td>
+            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'quantity', this.innerText)">${item.quantity}</td>
+            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'price', this.innerText)">${parseFloat(item.price).toFixed(2)}</td>
+            <td>
+              <select onchange="updateItem(${index}, 'type', this.value)">
+                <option value="" ${item.type === "" ? "selected" : ""}></option>
+                <option value="protein" ${item.type === "protein" ? "selected" : ""}>Protein</option>
+                <option value="carbs" ${item.type === "carbs" ? "selected" : ""}>Carbs</option>
+                <option value="vegetables" ${item.type === "vegetables" ? "selected" : ""}>Vegetables</option>
+                <option value="fruit" ${item.type === "fruit" ? "selected" : ""}>Fruit</option>
+                <option value="snacks" ${item.type === "snacks" ? "selected" : ""}>Snacks</option>
+                <option value="other" ${item.type === "other" ? "selected" : ""}>Other</option>
+              </select>
+            </td>
+            <td><button class="delete-btn" tabindex="0" onclick="deleteItem(${index})">Delete</button></td>
+          `;
+          tbody.appendChild(row);
+        }
+      });
+
+      const placeholderRow = document.createElement("tr");
+      placeholderRow.innerHTML = `
+        <td>99</td>
+        <td>${manualItemCounter}</td>
+        <td contenteditable="true" id="new-placeholder" onfocus="selectText(this)" onblur="commitPlaceholder(this)"></td>
+        <td contenteditable="true" onfocus="selectText(this)">1</td>
+        <td contenteditable="true" onfocus="selectText(this)">0.00</td>
+        <td>
+          <select>
+            <option value=""></option>
+            <option value="protein">Protein</option>
+            <option value="carbs">Carbs</option>
+            <option value="vegetables">Vegetables</option>
+            <option value="fruit">Fruit</option>
+            <option value="snacks">Snacks</option>
+            <option value="other">Other</option>
+          </select>
+        </td>
+        <td></td>
+      `;
+      tbody.appendChild(placeholderRow);
+
+      const totalRow = document.createElement("tr");
+      totalRow.innerHTML = `
+        <td colspan="4" style="text-align:right; font-weight:bold">Total:</td>
+        <td colspan="3" style="text-align:left; font-weight:bold">$${grandTotal.toFixed(2)}</td>
+      `;
+      tbody.appendChild(totalRow);
+
+      if (focusLastPlaceholder) {
+        setTimeout(() => {
+          const newCell = document.getElementById("new-placeholder");
+          newCell?.focus();
+          selectText(newCell);
+        }, 50);
+      }
+    }
+
+    function updateItem(index, field, value) {
+      if (field === "price" || field === "quantity") {
+        itemList[index][field] = parseFloat(value) || 0;
+      } else {
+        itemList[index][field] = value.trim();
+      }
+      saveAllToFirebase();
+    }
+
+    function deleteItem(index) {
+      itemList.splice(index, 1);
+      saveAllToFirebase();
+      renderTable();
+    }
+
+    function saveAllToFirebase() {
+      db.ref("receipts/latest").set({ items: itemList });
+    }
+
+    function selectText(el) {
+      requestAnimationFrame(() => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    }
+
+    function toggleGroupBy(value) {
+      groupBy = value;
+      renderTable();
+    }
+
+    function exportToCSV() {
+      const headers = ["Receipt #", "Item #", "Item", "Quantity", "Price", "Type"];
+      const rows = itemList.map(item => [
+        item.receiptNumber,
+        item.itemNumber,
+        `"${item.item.replace(/"/g, '""')}"`,
+        item.quantity,
+        item.price,
+        item.type
+      ]);
+
+      let csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(",") + "\n"
+        + rows.map(r => r.join(",")).join("\n");
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "receipt_data.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && document.activeElement.isContentEditable) {
+        event.preventDefault();
+        const td = document.activeElement;
+        const currentRow = td.parentElement;
+        const nextRow = currentRow.nextElementSibling;
+        const cellIndex = Array.from(td.parentElement.children).indexOf(td);
+        if (nextRow && nextRow.children[cellIndex]) {
+          const nextCell = nextRow.children[cellIndex];
+          nextCell.focus();
+          selectText(nextCell);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
