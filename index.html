@@ -1,650 +1,497 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Receipt Scanner & Manager</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checkings (Groups + CRUD, Sidebar)</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
-      padding: 10px; 
-      background: #f4f4f4; 
-      margin: 0; 
-      line-height: 1.4;
-    }
-    h1, h2 { 
-      text-align: center; 
-      margin: 10px 0; 
-      font-size: 1.5rem;
-    }
-    #controls { 
-      display: flex; 
-      flex-direction: column;
-      gap: 8px; 
-      margin: 10px 0; 
-    }
-    .btn { 
-      padding: 12px 16px; 
-      cursor: pointer; 
-      border: none; 
-      background: #007bff; 
-      color: white; 
-      border-radius: 8px; 
-      font-size: 1rem;
-      width: 100%;
-    }
-    .btn:hover { 
-      background: #0056b3; 
-    }
-    .btn.secondary {
-      background: #6c757d;
-    }
-    .btn.secondary:hover {
-      background: #5a6268;
-    }
-    #preview { 
-      max-width: 100%; 
-      display: block; 
-      margin: 10px auto; 
-      max-height: 300px;
-      border-radius: 8px;
-    }
-    #cameraPreview {
-      width: 100%;
-      max-height: 300px;
-      object-fit: cover;
-      border-radius: 8px;
-      display: none;
-    }
-    .table-container { 
-      max-height: 60vh; 
-      overflow-y: auto; 
-      margin-top: 10px; 
-      background: white; 
-      border-radius: 8px;
-      -webkit-overflow-scrolling: touch;
-    }
-    table { 
-      width: 100%; 
-      border-collapse: collapse; 
-      font-size: 0.9rem; 
-    }
-    th, td { 
-      border: 1px solid #ccc; 
-      padding: 8px; 
-      text-align: center; 
-    }
-    th { 
-      background: #ddd; 
-      position: sticky; 
-      top: 0; 
-      z-index: 1; 
-      font-size: 0.8rem;
-    }
-    .delete-btn { 
-      cursor: pointer; 
-      color: white; 
-      padding: 4px 8px; 
-      border: none; 
-      border-radius: 4px; 
-      background-color: #dc3545;
-      font-size: 0.8rem;
-    }
-    .delete-btn:focus { 
-      outline: 2px solid #000; 
-    }
-    #groupControls { 
-      margin: 10px 0; 
-      text-align: center; 
-    }
-    #exportButton { 
-      margin-top: 10px; 
-      width: 100%;
-      padding: 12px;
-    }
-    .tab-container { 
-      display: flex; 
-      justify-content: center; 
-      margin-bottom: 15px;
-      gap: 5px;
-    }
-    .tab { 
-      padding: 10px 15px; 
-      cursor: pointer; 
-      background: #ddd; 
-      border: none; 
-      border-radius: 8px;
-      font-size: 0.9rem;
-      flex: 1;
-      text-align: center;
-    }
-    .tab.active { 
-      background: #007bff; 
-      color: white; 
-    }
-    .content-section { 
-      display: none; 
-    }
-    .content-section.active { 
-      display: block; 
-    }
-    select, input[type="file"] {
-      width: 100%;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 1rem;
-      margin-bottom: 8px;
-    }
-    #cameraControls {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    #cameraControls button {
-      flex: 1;
-    }
-    @media (min-width: 768px) {
-      #controls {
-        flex-direction: row;
-        flex-wrap: wrap;
-      }
-      .btn {
-        width: auto;
-        flex: 1;
-      }
-      #imageInput {
-        flex: 2;
-      }
-    }
+    body{font-family:system-ui,Segoe UI,Roboto,Inter,Arial,sans-serif;margin:16px}
+    h1{font-size:1.1rem;margin:0 0 10px}
+    #status{margin:8px 0;color:#000;font-size:0.95rem;font-weight:600}
+    #status:empty{display:none}
+    .toolbar{margin:8px 0}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:6px;font-size:14px}
+    th{background:#f6f6f6;text-align:left}
+    td.num{text-align:right}
+    button{padding:4px 8px}
+    tr.group td{background:#eee;font-weight:700;cursor:pointer}
+    .group-namecell{display:flex;align-items:center;justify-content:flex-start;gap:8px}
+
+    /* Slide-in sidebar (minimal) */
+    .sidebar{position:fixed;top:0;left:0;height:100vh;width:min(100vw,360px);background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:16px;overflow:auto;transform:translateX(-110%);transition:transform .2s ease;z-index:1000}
+    .sidebar.open{transform:translateX(0)}
+    .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:999}
+    .backdrop.show{opacity:1;pointer-events:auto}
+    .field{display:grid;gap:4px;margin:8px 0}
+    input, select{padding:6px;border:1px solid #ccc;border-radius:6px}
+    .row-actions{display:flex;gap:6px}
+
+    /* Amount coloring */
+    .amt-pos{color:#1a7f37;font-variant-numeric:tabular-nums}
+    .amt-neg{color:#c0392b;font-variant-numeric:tabular-nums}
+
+    /* Mobile view: hide selected columns when table has .mobile */
+    #tbl.mobile th:nth-child(3),
+    #tbl.mobile th:nth-child(4),
+    #tbl.mobile th:nth-child(7),
+    #tbl.mobile td:nth-child(3),
+    #tbl.mobile td:nth-child(4),
+    #tbl.mobile td:nth-child(7){display:none}
+
+    /* Sidebar advanced toggle */
+    .sidebar details{margin-top:8px}
+    .sidebar details > summary{cursor:pointer;font-weight:600}    /* Month filter bar */
+    .monthbar{display:inline-flex;align-items:center;gap:6px;margin-left:8px}
+    .monthbar .label{min-width:110px;text-align:center;font-weight:600}
+    .monthbar button{min-width:28px}
+
+    /* Always hide the Group column (3rd col) */
+    #tbl th:nth-child(3),
+    #tbl td:nth-child(3){display:none}
+      /* Top report (horizontal bars) */
+    .report{margin:10px 0 14px}
+    .report .row{display:flex;align-items:center;gap:10px;margin:6px 0}
+    .report .label{width:80px;font-weight:600}
+    .report .val{width:90px;text-align:right;font-variant-numeric:tabular-nums}
+    .report .bar{flex:1;height:12px;background:#f2f2f2;border-radius:6px;overflow:hidden}
+    .report .fill{height:100%}
+    .report .fill.income{background:#1f7a8c}
+    .report .fill.needs{background:#6c5ce7}
+    .report .fill.wants{background:#e67e22}
+    .report .fill.savings{background:#2ecc71}
   </style>
 </head>
 <body>
-  <h1>Receipt Scanner & Manager</h1>
-
-  <div class="tab-container">
-    <button class="tab" onclick="switchTab('scanner')">Scanner</button>
-    <button class="tab active" onclick="switchTab('manager')">Item Manager</button>
+  <h1>Checkings</h1>
+  <div id="report" class="report">
+    <div class="row"><div class="label">Income</div><div id="val-income" class="val"></div><div class="bar"><div id="bar-income" class="fill income" style="width:0%"></div></div></div>
+    <div class="row"><div class="label">Needs</div><div id="val-needs" class="val"></div><div class="bar"><div id="bar-needs" class="fill needs" style="width:0%"></div></div></div>
+    <div class="row"><div class="label">Wants</div><div id="val-wants" class="val"></div><div class="bar"><div id="bar-wants" class="fill wants" style="width:0%"></div></div></div>
+    <div class="row"><div class="label">Savings</div><div id="val-savings" class="val"></div><div class="bar"><div id="bar-savings" class="fill savings" style="width:0%"></div></div></div>
   </div>
-
-  <div id="scanner-section" class="content-section">
-    <h2>Receipt Scanner</h2>
-    <div id="controls">
-      <input type="file" id="imageInput" accept="image/*" capture="environment" class="btn secondary" />
-      <button class="btn" onclick="startCamera()">Use Camera</button>
-      <button class="btn" onclick="processReceipt()">Scan Receipt</button>
-      <button class="btn secondary" onclick="addManualEntry()">Add Item Manually</button>
-    </div>
-    <img id="preview" src="" />
-    <video id="cameraPreview" autoplay playsinline></video>
-    <div id="cameraControls" style="display: none;">
-      <button class="btn" onclick="captureImage()">Capture</button>
-      <button class="btn secondary" onclick="stopCamera()">Cancel</button>
-    </div>
+  <div class="toolbar">
+    <button id="addBtn">Add New</button>
+    <button id="toggleGroupBtn" aria-pressed="true">Grouping: ON<\/button>
+    <button id="mobileBtn" aria-pressed="false">Mobile View: OFF</button>
+    <span class="monthbar">
+      <button id="prevMonth" title="Previous month" aria-label="Previous month">◀</button>
+      <span id="monthLabel" class="label"></span>
+      <button id="nextMonth" title="Next month" aria-label="Next month">▶</button>
+    </span>
   </div>
+  <div id="status"></div>
 
-  <div id="manager-section" class="content-section active">
-    <h2>Item Manager</h2>
-    <div id="groupControls">
-      <label for="grouping">Group View: </label>
-      <select id="grouping" onchange="toggleGroupBy(this.value)">
-        <option value="regular">Regular View</option>
-        <option value="receipt">Group by Receipt</option>
-        <option value="type">Group by Type</option>
-      </select>
-    </div>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th>day</th>
+        <th>name1</th>
+        <th>group</th>
+        <th>budget</th>
+        <th>category</th>
+        <th>amount</th>
+        <th>note</th>
+        <th>actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
 
-    <div class="table-container">
-      <table id="itemsTable">
-        <thead>
-          <tr>
-            <th>Receipt #</th>
-            <th>Item #</th>
-            <th>Item</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Type</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <button id="exportButton" class="btn" onclick="exportToCSV()">Export to CSV</button>
-  </div>
+  <!-- Sidebar form -->
+  <aside class="sidebar" id="sidebar" aria-hidden="true">
+    <h2 id="formTitle" style="margin:0 0 8px;font-size:1rem">New Item</h2>
+    <form id="frm">
+      <input type="hidden" id="f-id" />
+      <!-- Order: day, name1, amount, budget, category -->
+      <label class="field">day<input type="date" id="f-day" required></label>
+      <label class="field">name1<input type="text" id="f-name1" required></label>
+      <label class="field">amount<input type="number" id="f-amount" inputmode="decimal" step="0.01"></label>
+      <label class="field">budget
+        <div id="f-budget-toggle">
+          <label><input type="radio" name="f-budget" value="needs"> needs</label>
+          <label><input type="radio" name="f-budget" value="wants" checked> wants</label>
+          <label><input type="radio" name="f-budget" value="income"> income</label>
+        </div>
+      </label>
+      <label class="field">category
+        <select id="f-category">
+          <option value="grocery">grocery</option>
+          <option value="essentials">essentials</option>
+          <option value="fast food">fast food</option>
+          <option value="snacks">snacks</option>
+          <option value="coffee">coffee</option>
+          <option value="fuel">fuel</option>
+          <option value="date night">date night</option>
+          <option value="fun">fun</option>
+          <option value="shopping">shopping</option>
+          <option value="clothing">clothing</option>
+          <option value="other">other</option>
+        </select>
+      </label>
+      <label class="field">note<input type="text" id="f-note"></label>
+      <div class="row-actions">
+        <button type="submit">Save</button>
+        <button type="button" id="cancelBtn">Cancel</button>
+      </div>
+      <!-- Below buttons: More options (collapsed) -->
+      <details id="advancedOpts">
+        <summary>More options</summary>
+        <label class="field">group<input type="text" id="f-group"></label>
+        <label class="field">positive<input type="checkbox" id="f-positive"></label>
+        <label class="field">recurring<input type="checkbox" id="f-recurring"></label>
+      </details>
+    </form>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDuhEFWYDi65lk9M1dmIt2zQ31NxeqVuGM",
-      authDomain: "barcodescannerapp-65656.firebaseapp.com",
-      databaseURL: "https://barcodescannerapp-65656-default-rtdb.firebaseio.com",
-      projectId: "barcodescannerapp-65656",
-      storageBucket: "barcodescannerapp-65656.appspot.com",
-      messagingSenderId: "489535409057",
-      appId: "1:489535409057:web:25eaafbc8b45e99adb19e0"
+  // Groups + CRUD via Firebase RTDB REST API (no external libs)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAJxlQ6Fgh-f6x7V1EHMVTSR3wB3pi7oz4",
+    authDomain: "expensetracker-5aa50.firebaseapp.com",
+    databaseURL: "https://expensetracker-5aa50-default-rtdb.firebaseio.com",
+    projectId: "expensetracker-5aa50",
+    storageBucket: "expensetracker-5aa50.firebasestorage.app",
+    messagingSenderId: "692197621753",
+    appId: "1:692197621753:web:44dc693b08fd2c1cd34728"
+  };
+
+  const base = (firebaseConfig.databaseURL || '').replace(/\/$/, '');
+  const statusEl = document.getElementById('status');
+  const rowsEl = document.getElementById('rows');
+  const addBtn = document.getElementById('addBtn');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('backdrop');
+  const form = document.getElementById('frm');
+  const formTitle = document.getElementById('formTitle');
+  const toggleGroupBtn = document.getElementById('toggleGroupBtn');
+  const mobileBtn = document.getElementById('mobileBtn');
+  const tbl = document.getElementById('tbl');
+  let grouping = true;
+  let mobile = false;
+
+  // Month filter state (defaults to current month)
+  const prevMonthBtn = document.getElementById('prevMonth');
+  const nextMonthBtn = document.getElementById('nextMonth');
+  const monthLabel = document.getElementById('monthLabel');
+  let curY = (new Date()).getFullYear();
+  let curM = (new Date()).getMonth(); // 0-11
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function updateMonthLabel(){ monthLabel.textContent = MONTHS[curM] + ' ' + curY; }
+  function inSelectedMonth(r){
+    const s = (r && r.day) || '';
+    const parts = s.split('-');
+    if (parts.length !== 3) return false;
+    const y = Number(parts[0]);
+    const mo = Number(parts[1]);
+    if (!Number.isFinite(y) || !Number.isFinite(mo)) return false;
+    return (y === curY) && (mo === (curM + 1));
+  }
+
+  const fId = document.getElementById('f-id');
+  const fDay = document.getElementById('f-day');
+  const fName1 = document.getElementById('f-name1');
+  const fGroup = document.getElementById('f-group');
+  const fCategory = document.getElementById('f-category');
+  const fAmount = document.getElementById('f-amount');
+  const fPositive = document.getElementById('f-positive');
+  const fRecurring = document.getElementById('f-recurring');
+  const fNote = document.getElementById('f-note');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  // budget toggle helpers
+  function getBudget(){ const el = form.querySelector('input[name="f-budget"]:checked'); return el ? el.value : ''; }
+  function setBudget(v){ const els = form.querySelectorAll('input[name="f-budget"]'); let picked=false; els.forEach(e=>{ if(e.value===v){ e.checked=true; picked=true; }}); if(!picked){ const wants = form.querySelector('input[name=\"f-budget\"][value=\"wants\"]'); if(wants) wants.checked=true; } }
+
+  function setStatus(msg){ statusEl.textContent = msg || ''; }
+  function cell(text, cls){ const td=document.createElement('td'); if(cls) td.className=cls; td.textContent = text ?? ''; return td; }
+
+  function fmtAmount(v){
+    if(v===undefined||v===null||v==='') return '';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '';
+    const sign = n<0 ? '-' : '';
+    const abs = Math.abs(n);
+    return `${sign}$${abs.toFixed(2)}`;
+  }
+  function dollarsFromRecord(r){
+    if (!r) return null;
+    if (r.amount !== undefined && r.amount !== null) return Number(r.amount);
+    if (r.amountMinor !== undefined && r.amountMinor !== null) return Number(r.amountMinor) / 100;
+    return null;
+  }
+
+  function updateReportTotals(t){
+    const base = Math.abs(t.income || 0);
+    const pct = (v)=> base>0 ? Math.max(0, Math.min(100, Math.abs(v)/base*100)) : 0;
+    const set = (key, amt, widthPct)=>{
+      const fill = document.getElementById('bar-' + key);
+      if (fill) fill.style.width = (widthPct||0).toFixed(0) + '%';
+      const valEl = document.getElementById('val-' + key);
+      if (valEl) valEl.textContent = fmtAmount(amt || 0);
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    set('income', t.income||0, base>0?100:0);
+    set('needs', t.needs||0, pct(t.needs||0));
+    set('wants', t.wants||0, pct(t.wants||0));
+    set('savings', t.savings||0, pct(t.savings||0));
+  }
 
-    const openaiKey = "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";
+  function openCreate(){
+    formTitle.textContent = 'New Item';
+    const t = new Date();
+    const yyyy = t.getFullYear();
+    const mm = String(t.getMonth() + 1).padStart(2, '0');
+    const dd = String(t.getDate()).padStart(2, '0');
+    fId.value='';
+    fDay.value=`${yyyy}-${mm}-${dd}`; // default to today's local date
+    fName1.value=''; fGroup.value=''; setBudget('wants'); fCategory.value='other'; fAmount.value=''; fPositive.checked=false; fRecurring.checked=false; fNote.value='';
+    sidebar.classList.add('open'); sidebar.setAttribute('aria-hidden','false'); backdrop.classList.add('show');
+    setTimeout(()=>fDay.focus(),0);
+  }
+  function openCreatePrefill({ group = '', budget = '' } = {}){ openCreate(); fGroup.value = group; setBudget(budget || 'wants'); }
+  function openEdit(id, r){
+    formTitle.textContent = 'Edit Item';
+    fId.value=id; fDay.value=r.day||''; fName1.value=r.name1||''; fGroup.value=r.group||''; setBudget(r.budget || 'wants'); fCategory.value = r.category || 'other'; const __amt = dollarsFromRecord(r); fAmount.value = (__amt===null||Number.isNaN(__amt)) ? '' : __amt.toFixed(2); fPositive.checked = (r.positive === true) || (Number(__amt) > 0); fRecurring.checked = (r.recurring === true); fNote.value=r.note||'';
+    sidebar.classList.add('open'); sidebar.setAttribute('aria-hidden','false'); backdrop.classList.add('show');
+    setTimeout(()=>fName1.focus(),0);
+  }
+  function closeSidebar(){ sidebar.classList.remove('open'); sidebar.setAttribute('aria-hidden','true'); backdrop.classList.remove('show'); }
 
-    let itemList = [];
-    let receiptNumber = 1;
-    let manualItemCounter = 1;
-    let groupBy = 'regular';
-    let stream = null;
-
-    const imageInput = document.getElementById('imageInput');
-    const preview = document.getElementById('preview');
-    const cameraPreview = document.getElementById('cameraPreview');
-    const cameraControls = document.getElementById('cameraControls');
-
-    // Set manager as default view
-    window.onload = async function () {
-      const snapshot = await db.ref("receipts/latest").once("value");
-      const data = snapshot.val();
-      if (data && Array.isArray(data.items)) {
-        itemList = data.items;
-        const allReceipts = itemList.map(i => i.receiptNumber);
-        receiptNumber = allReceipts.length ? Math.max(...allReceipts.filter(n => n !== 99)) + 1 : 1;
-        manualItemCounter = itemList.filter(i => i.receiptNumber === 99).length + 1;
-        renderTable();
-      }
+  async function saveRec(){
+    const id = fId.value.trim();
+    const day = fDay.value || '';
+    const rec = {
+      day,
+      name1: fName1.value || '',
+      group: fGroup.value || '',
+      budget: getBudget(),
+      amount: (()=>{ if(fAmount.value==='') return null; const v=Number(parseFloat(fAmount.value).toFixed(2)); const abs=Math.abs(v); return fPositive.checked ? abs : -abs; })(),
+      positive: !!fPositive.checked,
+      recurring: !!fRecurring.checked,
+      category: fCategory.value || '',
+      note: fNote.value || ''
     };
-
-    function switchTab(tabName) {
-      document.querySelectorAll('.content-section').forEach(section => {
-        section.classList.remove('active');
-      });
-      document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      
-      document.getElementById(`${tabName}-section`).classList.add('active');
-      document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
-      
-      if (tabName === 'manager') {
-        renderTable();
-      } else if (tabName === 'scanner') {
-        stopCamera(); // Ensure camera is off when switching away
-      }
-    }
-
-    // Camera functions
-    async function startCamera() {
-      try {
-        stopCamera(); // Stop any existing stream
-        
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          },
-          audio: false 
-        });
-        
-        cameraPreview.srcObject = stream;
-        cameraPreview.style.display = 'block';
-        preview.style.display = 'none';
-        cameraControls.style.display = 'flex';
-        imageInput.style.display = 'none';
-        
-        // Hide other buttons when camera is active
-        document.querySelectorAll('#controls button:not(#cameraControls button)').forEach(btn => {
-          btn.style.display = 'none';
-        });
-      } catch (err) {
-        console.error("Camera error:", err);
-        alert("Could not access the camera. Please check permissions.");
-      }
-    }
-
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-      }
-      cameraPreview.style.display = 'none';
-      cameraControls.style.display = 'none';
-      preview.style.display = 'block';
-      imageInput.style.display = 'block';
-      
-      // Show other buttons again
-      document.querySelectorAll('#controls button').forEach(btn => {
-        btn.style.display = 'block';
-      });
-    }
-
-    function captureImage() {
-      const canvas = document.createElement('canvas');
-      canvas.width = cameraPreview.videoWidth;
-      canvas.height = cameraPreview.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
-      
-      preview.src = canvas.toDataURL('image/jpeg');
-      stopCamera();
-    }
-
-    imageInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => { 
-          preview.src = reader.result; 
-          preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    async function processReceipt() {
-      let imageSrc;
-      
-      if (preview.src && preview.src !== '') {
-        imageSrc = preview.src;
+    try{
+      if (id) {
+        await fetch(`${base}/checkings/${encodeURIComponent(id)}.json`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rec) });
       } else {
-        alert("Please upload a receipt image or capture one with the camera.");
-        return;
+        await fetch(`${base}/checkings.json`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rec) });
       }
+      closeSidebar();
+      updateMonthLabel();
+      load();
+      setStatus('');
+    }catch(err){ setStatus('Error: ' + (err.message || err)); }
+  }
 
-      try {
-        const { data: { text } } = await Tesseract.recognize(imageSrc, 'eng');
-        const parsed = await sendToOpenAI(text);
-        if (!parsed || !Array.isArray(parsed.items)) {
-          alert("Failed to parse items. Please try again with a clearer image.");
-          return;
-        }
-
-        const newItems = parsed.items.map((item, i) => ({
-          item: item.item || '',
-          quantity: parseFloat(item.quantity) || 1,
-          price: parseFloat(item.price) || 0,
-          type: item.type || "other",
-          receiptNumber: receiptNumber,
-          itemNumber: i + 1
-        }));
-
-        itemList.push(...newItems);
-        receiptNumber++;
-        renderTable();
-        saveAllToFirebase();
-        switchTab('manager');
-        
-        // Clear the preview
-        preview.src = '';
-        imageInput.value = '';
-      } catch (error) {
-        console.error("Processing error:", error);
-        alert("An error occurred while processing the receipt. Please try again.");
-      }
-    }
-
-    async function sendToOpenAI(receiptText) {
-      const prompt = `Extract and normalize itemized entries from this receipt. For each item:
-1. Replace with common name (e.g., "Granny Smith Apples" → "Apples")
-2. Determine the best category from: protein, carbs, vegetables, fruit, snacks, other
-3. Return JSON with item, quantity, price, and type
-
-Examples:
-- "Boneless Skinless Chicken Breast" → {"item": "Chicken Breast", "type": "protein"}
-- "Whole Wheat Bread" → {"item": "Bread", "type": "carbs"}
-- "Gala Apples" → {"item": "Apples", "type": "fruit"}
-- "Lays Potato Chips" → {"item": "Potato Chips", "type": "snacks"}
-- "Dove Body Wash" → {"item": "Body Wash", "type": "other"}
-
-Receipt Text:
-${receiptText}
-
-Return JSON format:
-{"items":[{"item":"Milk","quantity":1,"price":2.99,"type":"other"}]}`;
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.2,
-          response_format: { type: "json_object" }
-        })
+  /*
+    DELETE FLOW CONTRACT — DO NOT CHANGE WHEN REGENERATING
+    Order: DELETE /checkings/<id>.json (no headers) → fallback PATCH /checkings.json { "<id>": null }
+    Rationale: Works reliably in Windows ChatGPT webview (no preflight on DELETE), matches user's
+    known-good snippet. If regeneration is needed, keep this exact order and no confirm() popups.
+  */
+  async function removeRec(id, rowEl){
+    const key = encodeURIComponent(id);
+    try {
+      const res = await fetch(`${base}/checkings/${key}.json`, { method:'DELETE', cache:'no-store' });
+      if (!res.ok) throw 0;
+    } catch (_) {
+      const p = await fetch(`${base}/checkings.json`, {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ [id]: null })
       });
-      
-      const result = await response.json();
-      const content = result.choices?.[0]?.message?.content || "";
-      
-      try {
-        const jsonStart = content.indexOf('{');
-        const jsonEnd = content.lastIndexOf('}') + 1;
-        const parsed = JSON.parse(content.slice(jsonStart, jsonEnd));
-        
-        // Validate and clean the response
-        if (parsed && Array.isArray(parsed.items)) {
-          parsed.items = parsed.items.map(item => ({
-            item: item.item || '',
-            quantity: parseFloat(item.quantity) || 1,
-            price: parseFloat(item.price) || 0,
-            type: ["protein", "carbs", "vegetables", "fruit", "snacks", "other"].includes(item.type?.toLowerCase()) 
-                  ? item.type.toLowerCase() 
-                  : "other"
-          }));
-          return parsed;
-        }
-        return null;
-      } catch {
-        return null;
-      }
+      if (!p.ok) { setStatus('Delete error: ' + (await p.text())); return; }
     }
+    if (rowEl) rowEl.remove();
+    await load();
+    setStatus('');
+  }
 
-    function addManualEntry() {
-      const newItem = {
-        item: "New Item",
-        quantity: 1,
-        price: 0.00,
-        receiptNumber: 99,
-        itemNumber: manualItemCounter++,
-        type: ""
-      };
-      itemList.push(newItem);
-      renderTable();
-      saveAllToFirebase();
-      switchTab('manager');
-    }
+  function renderRow(id, r, groupKey){
+    const tr = document.createElement('tr');
+    tr.dataset.id = id;
+    if (groupKey !== undefined) tr.dataset.g = groupKey;
+    tr.appendChild(cell(r.day));
+    tr.appendChild(cell(r.name1));
+    tr.appendChild(cell(r.group));
+    tr.appendChild(cell(r.budget));
+    tr.appendChild(cell(r.category));
+    const _amtD = dollarsFromRecord(r);
+    const _amtTd = cell(fmtAmount(_amtD), 'num');
+    const _n = Number(_amtD);
+    if (Number.isFinite(_n)) _amtTd.classList.add(_n < 0 ? 'amt-neg' : 'amt-pos');
+    tr.appendChild(_amtTd);
+    tr.appendChild(cell(r.note));
 
-    function commitPlaceholder(td) {
-      const tr = td.parentElement;
-      const cells = tr.children;
-      const itemText = cells[2].innerText.trim();
-      const typeSelect = cells[5].querySelector("select");
-      const type = typeSelect?.value || "";
-      if (itemText) {
-        const newItem = {
-          item: itemText,
-          quantity: parseFloat(cells[3].innerText) || 1,
-          price: parseFloat(cells[4].innerText) || 0,
-          type: type,
-          receiptNumber: 99,
-          itemNumber: manualItemCounter++
-        };
-        itemList.push(newItem);
-        saveAllToFirebase();
-        renderTable(true);
-      }
-    }
-
-    function renderTable(focusLastPlaceholder = false) {
-      const tbody = document.querySelector("#itemsTable tbody");
-      tbody.innerHTML = "";
-      let grandTotal = 0;
-
-      let rowsToRender = itemList;
-      if (groupBy !== 'regular') {
-        const grouped = {};
-        itemList.forEach(item => {
-          const key = groupBy === 'type' ? item.type || 'Uncategorized' : `Receipt #${item.receiptNumber}`;
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(item);
-        });
-
-        rowsToRender = [];
-        for (const group in grouped) {
-          rowsToRender.push({ isGroup: true, name: group });
-          rowsToRender = rowsToRender.concat(grouped[group]);
-        }
-      }
-
-      rowsToRender.forEach((item, index) => {
-        if (item.isGroup) {
-          const groupRow = document.createElement("tr");
-          groupRow.innerHTML = `<td colspan="7" style="background:#eee; font-weight:bold; text-align:left">${item.name}</td>`;
-          tbody.appendChild(groupRow);
-        } else {
-          grandTotal += item.price * item.quantity;
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${item.receiptNumber}</td>
-            <td>${item.itemNumber}</td>
-            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'item', this.innerText)">${item.item}</td>
-            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'quantity', this.innerText)">${item.quantity}</td>
-            <td contenteditable="true" onfocus="selectText(this)" onblur="updateItem(${index}, 'price', this.innerText)">${parseFloat(item.price).toFixed(2)}</td>
-            <td>
-              <select onchange="updateItem(${index}, 'type', this.value)">
-                <option value="" ${item.type === "" ? "selected" : ""}></option>
-                <option value="protein" ${item.type === "protein" ? "selected" : ""}>Protein</option>
-                <option value="carbs" ${item.type === "carbs" ? "selected" : ""}>Carbs</option>
-                <option value="vegetables" ${item.type === "vegetables" ? "selected" : ""}>Vegetables</option>
-                <option value="fruit" ${item.type === "fruit" ? "selected" : ""}>Fruit</option>
-                <option value="snacks" ${item.type === "snacks" ? "selected" : ""}>Snacks</option>
-                <option value="other" ${item.type === "other" ? "selected" : ""}>Other</option>
-              </select>
-            </td>
-            <td><button class="delete-btn" tabindex="0" onclick="deleteItem(${index})">Delete</button></td>
-          `;
-          tbody.appendChild(row);
-        }
-      });
-
-      const placeholderRow = document.createElement("tr");
-      placeholderRow.innerHTML = `
-        <td>99</td>
-        <td>${manualItemCounter}</td>
-        <td contenteditable="true" id="new-placeholder" onfocus="selectText(this)" onblur="commitPlaceholder(this)"></td>
-        <td contenteditable="true" onfocus="selectText(this)">1</td>
-        <td contenteditable="true" onfocus="selectText(this)">0.00</td>
-        <td>
-          <select>
-            <option value=""></option>
-            <option value="protein">Protein</option>
-            <option value="carbs">Carbs</option>
-            <option value="vegetables">Vegetables</option>
-            <option value="fruit">Fruit</option>
-            <option value="snacks">Snacks</option>
-            <option value="other">Other</option>
-          </select>
-        </td>
-        <td></td>
-      `;
-      tbody.appendChild(placeholderRow);
-
-      const totalRow = document.createElement("tr");
-      totalRow.innerHTML = `
-        <td colspan="4" style="text-align:right; font-weight:bold">Total:</td>
-        <td colspan="3" style="text-align:left; font-weight:bold">$${grandTotal.toFixed(2)}</td>
-      `;
-      tbody.appendChild(totalRow);
-
-      if (focusLastPlaceholder) {
-        setTimeout(() => {
-          const newCell = document.getElementById("new-placeholder");
-          newCell?.focus();
-          selectText(newCell);
-        }, 50);
-      }
-    }
-
-    function updateItem(index, field, value) {
-      if (field === "price" || field === "quantity") {
-        itemList[index][field] = parseFloat(value) || 0;
-      } else {
-        itemList[index][field] = value.trim();
-      }
-      saveAllToFirebase();
-    }
-
-    function deleteItem(index) {
-      itemList.splice(index, 1);
-      saveAllToFirebase();
-      renderTable();
-    }
-
-    function saveAllToFirebase() {
-      db.ref("receipts/latest").set({ items: itemList });
-    }
-
-    function selectText(el) {
-      requestAnimationFrame(() => {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      });
-    }
-
-    function toggleGroupBy(value) {
-      groupBy = value;
-      renderTable();
-    }
-
-    function exportToCSV() {
-      const headers = ["Receipt #", "Item #", "Item", "Quantity", "Price", "Type"];
-      const rows = itemList.map(item => [
-        item.receiptNumber,
-        item.itemNumber,
-        `"${item.item.replace(/"/g, '""')}"`,
-        item.quantity,
-        item.price,
-        item.type
-      ]);
-
-      let csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n"
-        + rows.map(r => r.join(",")).join("\n");
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "receipt_data.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && document.activeElement.isContentEditable) {
-        event.preventDefault();
-        const td = document.activeElement;
-        const currentRow = td.parentElement;
-        const nextRow = currentRow.nextElementSibling;
-        const cellIndex = Array.from(td.parentElement.children).indexOf(td);
-        if (nextRow && nextRow.children[cellIndex]) {
-          const nextCell = nextRow.children[cellIndex];
-          nextCell.focus();
-          selectText(nextCell);
-        }
-      }
+    const actions = document.createElement('td');
+    const del = document.createElement('button');
+    del.textContent = 'Delete';
+    del.dataset.act = 'delete';
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      // No popups; delete immediately
+      removeRec(id, tr);
     });
+    actions.appendChild(del);
+    tr.appendChild(actions);
+    rowsEl.appendChild(tr);
+    return tr;
+  }
+
+  function mode(arr){ const m={}; let best='', n=0; for (const v of arr){ const k=(v??'').toString().trim(); if(!k) continue; const c=(m[k]=(m[k]||0)+1); if(c>n){n=c; best=k;} } return best; }
+  function dayMsOf(r){ const t = Date.parse((r && r.day) || ''); return Number.isNaN(t) ? -Infinity : t; }
+  function cmpDayIdDesc(a,b){ const d = dayMsOf(b[1]) - dayMsOf(a[1]); if (d !== 0) return d; return a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0; }
+
+  async function load(){
+    try{
+      const res = await fetch(`${base}/checkings.json?x=${Date.now()}`, { cache:'no-store' });
+      const data = await res.json();
+      rowsEl.innerHTML = '';
+      if(!data){ setStatus('No data.'); return; }
+
+      const entries = Object.entries(data);
+
+      // Apply month filter based on `day`
+      const filtered = entries.filter(([id, r]) => inSelectedMonth(r));
+
+      // === Report totals (within selected month) ===
+      let sumIncome=0, sumNeeds=0, sumWants=0, sumAll=0;
+      for (const [, r] of filtered){
+        const v = dollarsFromRecord(r);
+        if (v === null || !Number.isFinite(Number(v))) continue;
+        sumAll += Number(v);
+        const b = (r.budget||'').toLowerCase();
+        if (b === 'income') sumIncome += Number(v);
+        else if (b === 'needs') sumNeeds += Number(v);
+        else if (b === 'wants') sumWants += Number(v);
+      }
+      updateReportTotals({ income: sumIncome, needs: sumNeeds, wants: sumWants, savings: sumAll });
+
+      if (!grouping) {
+        filtered
+          .sort(cmpDayIdDesc)
+          .forEach(([id, r]) => renderRow(id, r));
+      } else {
+        // Grouped view by group (including empty)
+        const groups = new Map();
+        for (const [id, r] of filtered) {
+          const key = (r?.group ?? '').toString().trim();
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push([id, r]);
+        }
+        const names = Array.from(groups.keys()).sort((a,b)=>a.localeCompare(b));
+        for (const g of names) {
+          const items = groups.get(g).sort(cmpDayIdDesc);
+          const defaultBudget = mode(items.map(([id,r]) => r.budget));
+          const isNoGroup = (g === '');
+          const gh = document.createElement('tr'); gh.className = 'group' + (isNoGroup ? '' : ' closed'); gh.dataset.g = g;
+          // First cell: chevron + group name + Add
+          const c0 = document.createElement('td');
+          const wrap = document.createElement('div'); wrap.className = 'group-namecell';
+          const ind = document.createElement('span'); ind.className='ind'; ind.textContent = isNoGroup ? '▼' : '▶';
+          const nameSpan = document.createElement('span'); const label = g ? g : '(no group)'; nameSpan.textContent = label;
+          const addInline = document.createElement('button'); addInline.className='inline-add'; addInline.textContent = 'Add';
+          addInline.addEventListener('click', (ev)=>{ ev.stopPropagation(); openCreatePrefill({ group: g, budget: defaultBudget }); });
+          wrap.appendChild(ind); wrap.appendChild(nameSpan); wrap.appendChild(addInline);
+          c0.appendChild(wrap); gh.appendChild(c0);
+          // Fill remaining columns to keep alignment + show sum in amount column
+          const tdName1 = document.createElement('td'); // name1 (blank)
+          const tdGroup = document.createElement('td'); // group (blank)
+          const tdBudget = document.createElement('td'); // budget (blank)
+          const tdCategory = document.createElement('td'); // category (blank)
+
+          // Sum amounts for this group's items (within current month)
+          let sum = 0;
+          for (const [, rec] of items) {
+            const v = dollarsFromRecord(rec);
+            if (v !== null && Number.isFinite(Number(v))) sum += Number(v);
+          }
+          const tdAmount = document.createElement('td');
+          tdAmount.className = 'num';
+          tdAmount.textContent = fmtAmount(sum);
+          if (Number.isFinite(sum)) {
+            if (sum < 0) tdAmount.classList.add('amt-neg');
+            else if (sum > 0) tdAmount.classList.add('amt-pos');
+          }
+
+          const tdNote = document.createElement('td'); // note (blank)
+          const tdActions = document.createElement('td'); // actions (blank)
+
+          gh.appendChild(tdName1);
+          gh.appendChild(tdGroup);
+          gh.appendChild(tdBudget);
+          gh.appendChild(tdCategory);
+          gh.appendChild(tdAmount);
+          gh.appendChild(tdNote);
+          gh.appendChild(tdActions);
+          rowsEl.appendChild(gh);
+          for (const [id, r] of items) {
+            const row = renderRow(id, r, g);
+            if (!isNoGroup) row.style.display = 'none';
+          }
+        }
+      }
+      setStatus('');
+    }catch(err){ setStatus('Error: ' + (err.message || err)); }
+  }
+
+  // Click handler: group toggle OR row edit
+  rowsEl.addEventListener('click', async (e) => {
+    const header = e.target.closest('tr.group');
+    if (header) {
+      const g = header.dataset.g;
+      const closed = header.classList.toggle('closed');
+      const ind = header.querySelector('.ind');
+      const rows = rowsEl.querySelectorAll(`tr[data-g="${CSS.escape(g)}"]`);
+      if (ind) ind.textContent = closed ? '▶' : '▼';
+      if (closed) { let i=0; rows.forEach(row => { row.style.display = (i++===0)? '' : 'none'; }); }
+      else { rows.forEach(row => { row.style.display=''; }); }
+      return;
+    }
+
+    // If a delete button was clicked, do nothing here (its own handler runs)
+    if (e.target.closest('button[data-act="delete"]')) return;
+
+    const row = e.target.closest('tr[data-id]');
+    if (!row) return;
+    const id = row.dataset.id;
+    try {
+      const res = await fetch(`${base}/checkings/${encodeURIComponent(id)}.json?x=${Date.now()}`, { cache:'no-store' });
+      const rec = await res.json();
+      openEdit(id, rec || {});
+      setStatus('');
+    } catch (err) {
+      setStatus('Error: ' + (err.message || err));
+    }
+  });
+
+  // Sidebar + toolbar events
+  addBtn.addEventListener('click', openCreate);
+  cancelBtn.addEventListener('click', closeSidebar);
+  backdrop.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSidebar(); });
+  form.addEventListener('submit', (e)=>{ e.preventDefault(); saveRec(); });
+  toggleGroupBtn.addEventListener('click', () => {
+    grouping = !grouping;
+    toggleGroupBtn.textContent = 'Grouping: ' + (grouping ? 'ON' : 'OFF');
+    toggleGroupBtn.setAttribute('aria-pressed', grouping ? 'true' : 'false');
+    load();
+  });
+  mobileBtn.addEventListener('click', () => {
+    mobile = !mobile;
+    tbl.classList.toggle('mobile', mobile);
+    mobileBtn.textContent = 'Mobile View: ' + (mobile ? 'ON' : 'OFF');
+    mobileBtn.setAttribute('aria-pressed', mobile ? 'true' : 'false');
+  });
+
+  // Month navigation
+  prevMonthBtn.addEventListener('click', () => { curM -= 1; if (curM < 0) { curM = 11; curY -= 1; } updateMonthLabel(); load(); });
+  nextMonthBtn.addEventListener('click', () => { curM += 1; if (curM > 11) { curM = 0; curY += 1; } updateMonthLabel(); load(); });
+
+  updateMonthLabel();
+  load();
   </script>
 </body>
 </html>
